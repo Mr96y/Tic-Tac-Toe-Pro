@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Game stats
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  draws     Int      @default(0)
+  streak    Int      @default(0)
+  
+  // Relationships
+  gamePlayers GamePlayer[]
+  cards      UserCard[]
+  
+  @@map("users")
+}
+
+model GameRoom {
+  id          String   @id @default(cuid())
+  roomId      String   @unique
+  boardSize   Int      @default(3)
+  boardState  String   // JSON string of board state
+  currentTurn String   // Player ID
+  status      GameStatus @default(WAITING)
+  winner      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  players     GamePlayer[]
+  moves       GameMove[]
+  
+  @@map("game_rooms")
+}
+
+model GamePlayer {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  symbol    String   // 'X' or 'O'
+  joinedAt  DateTime @default(now())
+  
+  // Relationships
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      GameRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  moves     GameMove[]
+  
+  @@unique([userId, roomId])
+  @@map("game_players")
+}
+
+model GameMove {
+  id        String   @id @default(cuid())
+  roomId    String
+  playerId  String
+  position  Int      // 0-8 for 3x3, 0-15 for 4x4, etc.
+  symbol    String   // 'X' or 'O'
+  timestamp DateTime @default(now())
+  
+  // Relationships
+  room      GameRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  player    GamePlayer @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  @@map("game_moves")
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  type        CardType
+  rarity      CardRarity @default(COMMON)
+  effect      String   // JSON string of card effects
+  createdAt   DateTime @default(now())
+  
+  // Relationships
+  userCards   UserCard[]
+  
+  @@map("cards")
+}
+
+model UserCard {
+  id        String   @id @default(cuid())
+  userId    String
+  cardId    String
+  quantity  Int      @default(1)
+  used      Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  // Relationships
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card      Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, cardId])
+  @@map("user_cards")
+}
+
+enum GameStatus {
+  WAITING
+  PLAYING
+  FINISHED
+  ABANDONED
+}
+
+enum CardType {
+  PROTECTION
+  GIANT
+  DOUBLE_MOVE
+  BLOCK
+  SWAP_CELL
+  TIME_FREEZE
+  WILDCARD
+  SHIELD
+  TELEPORT
+  MIRROR
+  RESET
+}
+
+enum CardRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
